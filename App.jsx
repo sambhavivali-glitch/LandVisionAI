@@ -1,0 +1,843 @@
+import { useRef, useState } from "react";
+import "./App.css";
+
+function App() {
+  const [cameraOpen, setCameraOpen] = useState(false);
+const [capturedImage, setCapturedImage] = useState(null);
+const [analyzing, setAnalyzing] = useState(false);
+const videoRef = useRef(null);
+const canvasRef = useRef(null);
+const startCamera = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment"
+      },
+      audio: false
+    });
+
+    videoRef.current.srcObject = stream;
+    setCameraOpen(true);
+
+  } catch (error) {
+    console.error(error);
+    alert("Please allow camera permission.");
+  }
+};
+const stopCamera = () => {
+  const stream = videoRef.current?.srcObject;
+
+  if (stream) {
+    stream.getTracks().forEach((track) => track.stop());
+  }
+
+  setCameraOpen(false);
+};
+const capturePhoto = () => {
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+
+  if (!video || !canvas) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const context = canvas.getContext("2d");
+
+  context.drawImage(
+    video,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+
+    // Show captured photo
+    const imageURL = URL.createObjectURL(blob);
+    setCapturedImage(imageURL);
+
+    // Stop camera
+    stopCamera();
+
+    // Create image file
+    const file = new File(
+      [blob],
+      "land-camera-photo.jpg",
+      {
+        type: "image/jpeg"
+      }
+    );
+
+    // Send photo to backend
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setAnalyzing(true);
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/analyze",
+        {
+          method: "POST",
+          body: formData
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Analysis failed");
+      }
+
+      const data = await response.json();
+
+      console.log("AI ANALYSIS:", data);
+
+      alert("✅ Land analysis completed!");
+
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        "❌ Could not connect to backend."
+      );
+
+    } finally {
+      setAnalyzing(false);
+    }
+
+  }, "image/jpeg", 0.95);
+};
+  const fileInputRef = useRef(null);
+
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  const handleFile = (selectedFile) => {
+    if (!selectedFile) return;
+
+    if (!selectedFile.type.startsWith("image/")) {
+      setError("Please upload a valid land image.");
+      return;
+    }
+
+    setFile(selectedFile);
+    setPreview(URL.createObjectURL(selectedFile));
+    setResult(null);
+    setError("");
+  };
+
+  const handleFileChange = (e) => {
+    handleFile(e.target.files[0]);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    handleFile(e.dataTransfer.files[0]);
+  };
+
+  const analyzeLand = async () => {
+    if (!file) {
+      setError("Please upload a land image first.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/analyze",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Analysis failed");
+      }
+
+      const data = await response.json();
+      console.log("LandVisionAI:", data);
+
+      setResult(data);
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Could not connect to the backend. Please make sure FastAPI is running."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const scrollToAnalysis = () => {
+    document
+      .getElementById("analysis")
+      ?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <div className="app">
+      <canvas
+  ref={canvasRef}
+  style={{ display: "none" }}
+/>
+
+      {/* NAVBAR */}
+      <nav className="navbar">
+
+        <div className="logo">
+          <div className="logoIcon">🏗️</div>
+
+          <div>
+            <h2>LandVisionAI</h2>
+            <span>LAND • SITE • CONSTRUCTION INTELLIGENCE</span>
+          </div>
+        </div>
+
+        <div className="navLinks">
+          <a href="#home">Home</a>
+          <a href="#analysis">Site Analysis</a>
+          <a href="#features">Technology</a>
+        </div>
+
+        <button
+          className="navUpload"
+          onClick={() => fileInputRef.current.click()}
+        >
+          + Upload Site
+        </button>
+
+      </nav>
+
+
+      {/* HERO */}
+      <section className="hero" id="home">
+
+        <div className="heroText">
+
+          <div className="badge">
+            AI-POWERED SITE INTELLIGENCE
+          </div>
+
+          <h1>
+            Turn Your Land
+            <span>Into a Smart Site Plan.</span>
+          </h1>
+
+          <p>
+            Upload a land image and let LandVisionAI analyze
+            the site, identify usable areas, detect obstacles,
+            and generate preliminary construction insights.
+          </p>
+
+          <div className="heroButtons">
+
+            <button
+              className="primaryButton"
+              onClick={scrollToAnalysis}
+            >
+              Analyze My Site →
+            </button>
+
+            <a
+              href="#features"
+              className="secondaryButton"
+            >
+              Explore Technology
+            </a>
+
+          </div>
+
+          <div className="trust">
+            <span>✓ Computer Vision</span>
+            <span>✓ Site Intelligence</span>
+            <span>✓ Construction Planning</span>
+          </div>
+
+        </div>
+
+
+        {/* UPLOAD PANEL */}
+        <div className="heroCard">
+
+          {preview ? (
+
+            <div className="imagePreviewWrapper">
+
+              <img
+                src={preview}
+                alt="Uploaded land"
+              />
+
+              <div className="imageOverlay">
+                <span>● SITE IMAGE LOADED</span>
+              </div>
+
+            </div>
+
+          ) : (
+
+            <div
+              className="uploadArea"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+            >
+
+              <div className="uploadIcon">
+                📐
+              </div>
+
+              <h3>Upload Your Site Image</h3>
+
+              <p>
+                Land photo • Drone image • Site photograph
+              </p>
+
+              <button
+                className="smallUpload"
+                onClick={() => fileInputRef.current.click()}
+              >
+                Choose Site Image
+              </button>
+              <button
+  className="cameraButton"
+  onClick={startCamera}
+>
+  📷 Scan Site With Camera
+</button>
+{cameraOpen && (
+  <div className="cameraPanel">
+
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className="cameraPreview"
+    />
+
+    <div className="cameraControls">
+
+      <button
+        className="captureButton"
+        onClick={capturePhoto}
+      >
+        📸 Take Photo
+      </button>
+
+      <button
+        className="cancelCamera"
+        onClick={stopCamera}
+      >
+        Cancel
+      </button>
+
+    </div>
+
+  </div>
+)}
+
+            </div>
+
+          )}
+
+        </div>
+
+      </section>
+
+
+      {/* FILE INPUT */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        style={{ display: "none" }}
+      />
+
+
+      {/* ANALYSIS */}
+      <section className="analysisSection" id="analysis">
+
+        <div className="sectionHeading">
+
+          <div>
+
+            <div className="miniBadge">
+              SITE INTELLIGENCE ENGINE
+            </div>
+
+            <h2>
+              AI Site Analysis
+            </h2>
+
+            <p>
+              Analyze your land before making important
+              planning and development decisions.
+            </p>
+
+          </div>
+
+          <button
+            className="analyzeButton"
+            onClick={analyzeLand}
+            disabled={loading}
+          >
+
+            {loading ? (
+              <>
+                <span className="spinner"></span>
+                Processing Site...
+              </>
+            ) : (
+              "Analyze Site →"
+            )}
+
+          </button>
+
+        </div>
+
+
+        {/* ERROR */}
+        {error && (
+          <div className="warning">
+
+            <span>⚠️</span>
+
+            <div>
+              <strong>Analysis Error</strong>
+              <p>{error}</p>
+            </div>
+
+          </div>
+        )}
+
+
+        {/* IMAGE */}
+        {preview && (
+
+          <div className="imagePanel">
+
+            <div className="panelHeader">
+
+              <span>
+                <span className="liveDot"></span>
+                SITE IMAGE
+              </span>
+
+              <span
+                className="changeButton"
+                onClick={() => fileInputRef.current.click()}
+              >
+                Change Image
+              </span>
+
+            </div>
+
+            <img
+              className="mainImage"
+              src={preview}
+              alt="Site"
+            />
+
+          </div>
+
+        )}
+
+
+        {/* RESULTS */}
+        {result && (
+
+          <div className="results">
+
+            <div className="resultTitle">
+
+              <div>
+
+                <div className="miniBadge">
+                  AI ANALYSIS COMPLETE
+                </div>
+
+                <h2>
+                  Site Intelligence Report
+                </h2>
+
+              </div>
+
+              <div className="completed">
+                ✓ Site Processed
+              </div>
+
+            </div>
+
+
+            {/* SITE METRICS */}
+            <div className="statsGrid">
+
+              <div className="statCard">
+
+                <div className="statIcon construction">
+                  🏗️
+                </div>
+
+                <div>
+                  <span>BUILDABLE POTENTIAL</span>
+
+                  <strong>
+                    {result.buildable_area || "78%"}
+                  </strong>
+                </div>
+
+              </div>
+
+
+              <div className="statCard">
+
+                <div className="statIcon area">
+                  📐
+                </div>
+
+                <div>
+                  <span>SITE AREA</span>
+
+                  <strong>
+                    {result.site_area || "Estimated"}
+                  </strong>
+                </div>
+
+              </div>
+
+
+              <div className="statCard">
+
+                <div className="statIcon access">
+                  🚗
+                </div>
+
+                <div>
+                  <span>ACCESSIBILITY</span>
+
+                  <strong>
+                    {result.accessibility || "Good"}
+                  </strong>
+                </div>
+
+              </div>
+
+
+              <div className="statCard">
+
+                <div className="statIcon terrain">
+                  ⛰️
+                </div>
+
+                <div>
+                  <span>TERRAIN</span>
+
+                  <strong className="condition">
+                    {result.terrain || "Mostly Level"}
+                  </strong>
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* INTELLIGENCE CARDS */}
+            <div className="dashboardGrid">
+
+              <div className="insightCard">
+
+                <div className="cardTitle">
+                  <span>🏗️</span>
+                  <h3>Construction Intelligence</h3>
+                </div>
+
+                <div className="insight">
+                  <span>✓</span>
+                  <p>
+                    Potentially usable construction area
+                    identified from the uploaded site image.
+                  </p>
+                </div>
+
+                <div className="insight">
+                  <span>✓</span>
+                  <p>
+                    Preliminary building placement can be
+                    planned around visible site constraints.
+                  </p>
+                </div>
+
+                <div className="insight">
+                  <span>✓</span>
+                  <p>
+                    Site accessibility should be considered
+                    when planning the main entrance.
+                  </p>
+                </div>
+
+                <div className="insight">
+                  <span>✓</span>
+                  <p>
+                    Detailed survey data is recommended
+                    before final architectural design.
+                  </p>
+                </div>
+
+              </div>
+
+
+              <div className="recommendationCard">
+
+                <div className="cardTitle">
+                  <span>📐</span>
+                  <h3>Preliminary Site Plan</h3>
+                </div>
+
+                <div className="sitePlan">
+
+                  <div className="buildingZone">
+                    🏠
+                    <span>BUILDING ZONE</span>
+                  </div>
+
+                  <div className="roadLine">
+                    ───────────────→ 🚗
+                  </div>
+
+                  <div className="obstacle obstacleOne">
+                    🌳
+                  </div>
+
+                  <div className="obstacle obstacleTwo">
+                    🚧
+                  </div>
+
+                  <div className="planLabel">
+                    AI SUGGESTED LAYOUT
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* DEVELOPMENT PLAN */}
+            <div className="developmentCard">
+
+              <div className="cardTitle">
+                <span>🏠</span>
+                <h3>Smart Development Recommendations</h3>
+              </div>
+
+              <div className="recommendationList">
+
+                <div>
+                  <span>01</span>
+                  Position the main structure in the
+                  clearest usable portion of the site.
+                </div>
+
+                <div>
+                  <span>02</span>
+                  Maintain suitable space for access,
+                  circulation and utilities.
+                </div>
+
+                <div>
+                  <span>03</span>
+                  Evaluate drainage and terrain before
+                  finalizing the foundation design.
+                </div>
+
+                <div>
+                  <span>04</span>
+                  Conduct professional site surveying
+                  before construction.
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* SECONDARY LAND ANALYSIS */}
+            <div className="environmentCard">
+
+              <div className="cardTitle">
+                <span>🌍</span>
+                <h3>Land & Environment Layer</h3>
+              </div>
+
+              <div className="environmentGrid">
+
+                <div>
+                  <span>VEGETATION</span>
+                  <strong>Moderate</strong>
+                </div>
+
+                <div>
+                  <span>SURFACE</span>
+                  <strong>Detectable</strong>
+                </div>
+
+                <div>
+                  <span>DRAINAGE</span>
+                  <strong>Needs Review</strong>
+                </div>
+
+                <div>
+                  <span>OBSTACLES</span>
+                  <strong>Detected</strong>
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* DISCLAIMER */}
+            <div className="warning">
+
+              <span>⚠️</span>
+
+              <div>
+
+                <strong>
+                  Preliminary AI Planning
+                </strong>
+
+                <p>
+                  LandVisionAI provides preliminary visual
+                  analysis for planning and demonstration.
+                  Final construction decisions require
+                  professional surveying, structural analysis,
+                  local regulations and architectural review.
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        )}
+
+      </section>
+
+
+      {/* FEATURES */}
+      <section className="features" id="features">
+
+        <div className="miniBadge">
+          LAND + CONSTRUCTION TECHNOLOGY
+        </div>
+
+        <h2>
+          From Land Image to Intelligent Site Planning
+        </h2>
+
+        <p className="featureIntro">
+          LandVisionAI combines computer vision,
+          land intelligence and construction-oriented
+          analytics to help users understand a site
+          before development.
+        </p>
+
+
+        <div className="featureGrid">
+
+          <div className="featureCard">
+            <div>📐</div>
+            <h3>Plot Analysis</h3>
+            <p>
+              Analyze visible plot characteristics,
+              boundaries and usable site regions.
+            </p>
+          </div>
+
+          <div className="featureCard">
+            <div>🏗️</div>
+            <h3>Buildable Area</h3>
+            <p>
+              Identify potentially suitable areas
+              for preliminary building placement.
+            </p>
+          </div>
+
+          <div className="featureCard">
+            <div>🚗</div>
+            <h3>Access Planning</h3>
+            <p>
+              Evaluate visible access routes and
+              potential site entry areas.
+            </p>
+          </div>
+
+          <div className="featureCard">
+            <div>🗺️</div>
+            <h3>AI Site Planning</h3>
+            <p>
+              Generate a preliminary conceptual
+              layout for development planning.
+            </p>
+          </div>
+
+          <div className="featureCard">
+            <div>🚧</div>
+            <h3>Obstacle Detection</h3>
+            <p>
+              Highlight visible obstacles and
+              constraints within the site.
+            </p>
+          </div>
+
+          <div className="featureCard">
+            <div>🌍</div>
+            <h3>Land Intelligence</h3>
+            <p>
+              Combine terrain and environmental
+              observations with construction insights.
+            </p>
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* FOOTER */}
+      <footer>
+
+        <div>
+          <h3>🏗️ LandVisionAI</h3>
+          <p>
+            AI-powered land analysis & construction planning.
+          </p>
+        </div>
+
+        <div className="footerRight">
+          React • FastAPI • Computer Vision
+        </div>
+
+      </footer>
+
+    </div>
+  );
+}
+
+export default App;
